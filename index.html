@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Building 14 Energy Dashboard (kWh Focus)</title>
+    <title>Building 14 Energy Dashboard (Fixed Version)</title>
     <script src="https://cdn.rawgit.com/Mikhus/canvas-gauges/master/gauge.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -13,9 +13,9 @@
         body { background: #f4f7f6; margin: 0; padding: 20px; color: #2c3e50; }
         .container { max-width: 1200px; margin: auto; }
         
-        /* Header & Filters */
         .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 30px; }
         .header h1 { color: #1a2a6c; font-size: 1.8rem; margin: 0; }
+        
         .time-filters { display: flex; gap: 8px; margin-top: 10px; }
         .time-filters button {
             background: white; border: 1px solid #ddd; padding: 8px 16px; 
@@ -23,12 +23,10 @@
         }
         .time-filters button.active { background: #1a2a6c; color: white; border-color: #1a2a6c; }
 
-        /* Gauges */
         .gauge-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .gauge-box { background: white; padding: 25px 15px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); text-align: center; }
         .gauge-box .label { font-size: 1.2rem; font-weight: 600; margin-top: -15px; }
 
-        /* Chart Section */
         .chart-section { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); margin-bottom: 30px; }
 
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
@@ -41,6 +39,7 @@
             display: inline-flex; align-items: center; gap: 10px; background: #1d8552; color: white;
             text-decoration: none; padding: 12px 30px; border-radius: 50px; font-weight: 600; transition: 0.3s;
         }
+        .btn-sheet:hover { background: #156d41; transform: scale(1.05); }
     </style>
 </head>
 <body>
@@ -49,13 +48,13 @@
     <div class="header">
         <div>
             <h1>Dashboard พลังงานอาคาร 14</h1>
-            <p style="margin:0; color:#888;">Monitoring: Energy Consumption (kWh)</p>
+            <p style="margin:0; color:#888;">ข้อมูลเรียลไทม์: พลังงานสะสม (kWh)</p>
         </div>
         <div class="time-filters">
-            <button onclick="updateChart('live')" class="active">Live</button>
-            <button onclick="updateChart('1h')">1 ชม. </button>
-            <button onclick="updateChart('1d')">1 วัน </button>
-            <button onclick="updateChart('3d')">3 วัน </button>
+            <button id="btn-live" onclick="updateChart('live')" class="active">Live</button>
+            <button id="btn-1h" onclick="updateChart('1h')">1 ชม. (12 จุด)</button>
+            <button id="btn-1d" onclick="updateChart('1d')">1 วัน (24 จุด)</button>
+            <button id="btn-3d" onclick="updateChart('3d')">3 วัน (24 จุด)</button>
         </div>
     </div>
 
@@ -66,8 +65,8 @@
     </div>
 
     <div class="summary-grid">
-        <div class="info-card"><h4>พลังงานสะสมปัจจุบัน</h4><div class="value" id="val-kwh">0.0 kWh</div></div>
-        <div class="info-card"><h4>ประมาณการค่าไฟ</h4><div class="value" id="val-cost">0.00 ฿</div><span id="period-status" style="font-size:0.8rem;">-</span></div>
+        <div class="info-card"><h4>พลังงานสะสมปัจจุบัน</h4><div class="value" id="val-kwh">0.00 kWh</div></div>
+        <div class="info-card"><h4>ประมาณการค่าไฟ</h4><div class="value" id="val-cost">0.00 ฿</div><span id="period-status" style="font-size:0.8rem;">รอดึงข้อมูล...</span></div>
     </div>
 
     <div class="chart-section">
@@ -75,83 +74,94 @@
     </div>
 
     <div class="footer">
-        <a href="https://docs.google.com/spreadsheets/d/13V_l5g3pDKz-OWspX_Nx9mA-TuYFOxcazD09t8IWKwU/edit?gid=0#gid=0" target="_blank" class="btn-sheet">
-             📊 ดูข้อมูลอ้างอิง (Google Sheet)
+        <a id="sheetLink" href="https://docs.google.com/spreadsheets/d/13V_l5g3pDKz-OWspX_Nx9mA-TuYFOxcazD09t8IWKwU/edit" target="_blank" class="btn-sheet">
+             📊 ดูฐานข้อมูล Google Sheet
         </a>
     </div>
 </div>
 
 <script>
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxtIQG8BZdgOMPlhzWcwmzuhlOjpsKhz-AXpsPJxTrgyC9Xh4YSRc-hg76hC1FyOTDE/exec";
+    // URL สำหรับดึงข้อมูล (ตรวจสอบให้แน่ใจว่าได้ Deploy เป็นเวอร์ชันใหม่ใน Apps Script แล้ว)
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxR_U0VKyROaGE_locdROC8TgzftrUQsJghvbDEOsJjVmwU70tyhVXmVkezPzdy8la9/exec";
+    
     let allData = [];
 
-    // --- ตั้งค่ากราฟโชว์ค่า Energy (kWh) ---
+    // --- 1. ตั้งค่ากราฟ Chart.js ---
     const ctx = document.getElementById('energyChart').getContext('2d');
     const energyChart = new Chart(ctx, {
         type: 'line',
-        data: { labels: [], datasets: [{ label: 'พลังงานไฟฟ้า (kWh)', data: [], borderColor: '#1d8552', backgroundColor: 'rgba(29, 133, 82, 0.1)', fill: true, tension: 0.4 }] },
+        data: { labels: [], datasets: [{ label: 'พลังงานสะสม (kWh)', data: [], borderColor: '#1d8552', backgroundColor: 'rgba(29, 133, 82, 0.1)', fill: true, tension: 0.4 }] },
         options: {
             responsive: true,
             plugins: {
-                title: { display: true, text: 'กราฟแสดงพลังงานไฟฟ้าที่ใช้ (Energy Consumption)', font: { size: 18, family: 'Kanit' }, color: '#1d8552' },
+                title: { display: true, text: 'กราฟแสดงการใช้พลังงาน (Energy Usage)', font: { size: 18, family: 'Kanit' } },
                 legend: { position: 'bottom' }
             },
             scales: {
-                x: { title: { display: true, text: 'ช่วงเวลา (Time)', font: { weight: 'bold' } } },
-                y: { 
-                    beginAtZero: false, 
-                    title: { display: true, text: 'หน่วย (kWh)', font: { weight: 'bold' } } 
-                }
+                x: { title: { display: true, text: 'เวลา (Time)', font: { weight: 'bold' } } },
+                y: { beginAtZero: false, title: { display: true, text: 'หน่วย (kWh)', font: { weight: 'bold' } } }
             }
         }
     });
 
-    // --- เกจวัด ---
-    const gBase = { width:300, height:300, startAngle:90, ticksAngle:180, colorPlate:"#fff", borders:false, needleType:"arrow", needleWidth:3, valueBox:true, animationDuration:1000 };
+    // --- 2. ตั้งค่าเกจวัด ---
+    const gBase = { width:300, height:300, startAngle:90, ticksAngle:180, colorPlate:"#fff", borders:false, needleType:"arrow", needleWidth:3, valueBox:true, animationDuration:1500 };
     var gaugeV = new RadialGauge({ ...gBase, renderTo:'gauge-v', minValue:0, maxValue:300, majorTicks:["0","100","200","300"], highlights:[{from:180, to:240, color:'#2ecc71'}] }).draw();
     var gaugeA = new RadialGauge({ ...gBase, renderTo:'gauge-a', minValue:0, maxValue:100, majorTicks:["0","25","50","75","100"], highlights:[{from:80, to:100, color:'#e74c3c'}] }).draw();
     var gaugeW = new RadialGauge({ ...gBase, renderTo:'gauge-w', minValue:0, maxValue:20000, majorTicks:["0","5k","10k","15k","20k"], highlights:[{from:15000, to:20000, color:'#e74c3c'}] }).draw();
 
+    // --- 3. ฟังก์ชันดึงข้อมูลจาก Google Sheets ---
     async function fetchData() {
         try {
             const response = await fetch(APPS_SCRIPT_URL + "?action=read");
             const data = await response.json();
-            allData = data.full;
+            
+            // ใช้ data.history ให้ตรงกับชื่อที่ส่งมาจาก Apps Script
+            allData = data.history; 
             const latest = data.latest;
 
+            // อัปเดตเข็มเกจ
             gaugeV.value = latest.v;
             gaugeA.value = latest.a;
             gaugeW.value = latest.w;
-            document.getElementById('val-kwh').innerText = latest.kwh + " kWh";
+
+            // อัปเดตสรุปตัวเลข
+            document.getElementById('val-kwh').innerText = parseFloat(latest.kwh).toFixed(2) + " kWh";
             
-            let isOnPeak = (new Date().getHours() >= 9 && new Date().getHours() < 22);
+            let now = new Date();
+            let isOnPeak = (now.getHours() >= 9 && now.getHours() < 22);
             let cost = latest.kwh * ((isOnPeak ? 4.32 : 2.63) + 0.39) * 1.07;
             document.getElementById('val-cost').innerText = cost.toLocaleString(undefined, {minimumFractionDigits:2}) + " ฿";
             
-            document.getElementById('period-status').innerText = isOnPeak ? "ช่วงเวลา: ON-PEAK" : "ช่วงเวลา: OFF-PEAK";
-            document.getElementById('period-status').style.color = isOnPeak ? "#e74c3c" : "#2ecc71";
+            const statusEl = document.getElementById('period-status');
+            statusEl.innerText = "ช่วงเวลา: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
+            statusEl.style.color = isOnPeak ? "#e74c3c" : "#2ecc71";
 
-            let activeBtn = document.querySelector('.time-filters button.active').innerText;
-            if(activeBtn.includes("Live")) updateChart('live', false);
-            else if(activeBtn.includes("1 ชม")) updateChart('1h', false);
-            else if(activeBtn.includes("1 วัน")) updateChart('1d', false);
-            else updateChart('3d', false);
+            // อัปเดตกราฟตามโหมดที่เลือกอยู่ปัจจุบัน
+            const activeBtn = document.querySelector('.time-filters button.active').id;
+            const mode = activeBtn.replace('btn-', '');
+            updateChart(mode, false);
 
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error("Fetch Error:", e);
+            document.getElementById('period-status').innerText = "⚠️ การเชื่อมต่อข้อมูลขัดข้อง";
+        }
     }
 
+    // --- 4. ฟังก์ชันอัปเดตกราฟ (Filter & Downsampling) ---
     function updateChart(timeframe, changeBtn = true) {
         if (changeBtn) {
             document.querySelectorAll('.time-filters button').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            document.getElementById('btn-' + timeframe).classList.add('active');
         }
-        if (allData.length === 0) return;
+        
+        if (!allData || allData.length === 0) return;
 
         let limit = 60; let step = 1;
         if (timeframe === 'live') { limit = 12; step = 1; }
-        else if (timeframe === '1h') { limit = 60; step = 5; }
-        else if (timeframe === '1d') { limit = 1440; step = 60; }
-        else if (timeframe === '3d') { limit = 4320; step = 180; }
+        else if (timeframe === '1h') { limit = 60; step = 5; } // 60/5 = 12 จุด
+        else if (timeframe === '1d') { limit = 1440; step = 60; } // 1440/60 = 24 จุด
+        else if (timeframe === '3d') { limit = 4320; step = 180; } // 4320/180 = 24 จุด
 
         let rawSlice = allData.slice(-limit);
         let displayData = [];
@@ -159,11 +169,19 @@
             displayData.push(rawSlice[i]);
         }
 
-        energyChart.data.labels = displayData.map(d => d.time);
-        energyChart.data.datasets[0].data = displayData.map(d => d.kwh); // เปลี่ยนจาก .w เป็น .kwh
+        // จัดรูปแบบเวลาแกน X ให้เป็น HH:mm
+        energyChart.data.labels = displayData.map(d => {
+            let date = new Date(d.time);
+            return date.getHours().toString().padStart(2, '0') + ":" + 
+                   date.getMinutes().toString().padStart(2, '0');
+        });
+        
+        // ใช้ค่า kwh สำหรับแกน Y
+        energyChart.data.datasets[0].data = displayData.map(d => d.kwh);
         energyChart.update('none');
     }
 
+    // เริ่มการทำงานครั้งแรกและตั้งเวลาอัปเดตทุก 1 นาที
     fetchData();
     setInterval(fetchData, 60000);
 </script>
